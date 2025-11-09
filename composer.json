@@ -39,8 +39,7 @@
     },
     "autoload": {
         "psr-4": {
-            "AlexanderGabriel\\FilamentOauth2\\": "src/",
-            "AlexanderGabriel\\FilamentOauth2\\Database\\Factories\\": "database/factories/"
+            "AlexanderGabriel\\FilamentOauth2\\": "src/"
         }
     },
     "autoload-dev": {
@@ -66,10 +65,7 @@
         "laravel": {
             "providers": [
                 "AlexanderGabriel\\FilamentOauth2\\FilamentOauth2ServiceProvider"
-            ],
-            "aliases": {
-                "FilamentOauth2": "AlexanderGabriel\\FilamentOauth2\\Facades\\FilamentOauth2"
-            }
+            ]
         }
     },
     "minimum-stability": "dev",
