@@ -1,15 +1,15 @@
 <?php
 
-namespace VendorName\Skeleton;
+namespace AlexanderGabriel\FilamentOauth2;
 
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 
-class SkeletonPlugin implements Plugin
+class FilamentOauth2Plugin implements Plugin
 {
     public function getId(): string
     {
-        return 'skeleton';
+        return 'filament-oauth2';
     }
 
     public function register(Panel $panel): void
