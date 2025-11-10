@@ -2,12 +2,6 @@
 
 namespace AlexanderGabriel\FilamentOauth2;
 
-use Filament\Support\Assets\AlpineComponent;
-use Filament\Support\Assets\Asset;
-use Filament\Support\Assets\Css;
-use Filament\Support\Assets\Js;
-use Filament\Support\Facades\FilamentAsset;
-use Filament\Support\Facades\FilamentIcon;
 use Illuminate\Filesystem\Filesystem;
 use Livewire\Features\SupportTesting\Testable;
 use Spatie\LaravelPackageTools\Commands\InstallCommand;
@@ -34,19 +28,14 @@ class FilamentOauth2ServiceProvider extends PackageServiceProvider
             ->hasInstallCommand(function (InstallCommand $command) {
                 $command
                     ->publishConfigFile()
-                    ->publishMigrations()
-                    ->askToRunMigrations()
                     ->askToStarRepoOnGitHub('alexandergabriel/filament-oauth2');
-            });
+            })
+            ->hasRoutes('web');
 
         $configFileName = $package->shortName();
 
         if (file_exists($package->basePath("/../config/{$configFileName}.php"))) {
             $package->hasConfigFile();
-        }
-
-        if (file_exists($package->basePath('/../database/migrations'))) {
-            $package->hasMigrations($this->getMigrations());
         }
 
         if (file_exists($package->basePath('/../resources/lang'))) {
@@ -62,20 +51,6 @@ class FilamentOauth2ServiceProvider extends PackageServiceProvider
 
     public function packageBooted(): void
     {
-        // Asset Registration
-        FilamentAsset::register(
-            $this->getAssets(),
-            $this->getAssetPackageName()
-        );
-
-        FilamentAsset::registerScriptData(
-            $this->getScriptData(),
-            $this->getAssetPackageName()
-        );
-
-        // Icon Registration
-        FilamentIcon::register($this->getIcons());
-
         // Handle Stubs
         if (app()->runningInConsole()) {
             foreach (app(Filesystem::class)->files(__DIR__ . '/../stubs/') as $file) {
@@ -87,23 +62,6 @@ class FilamentOauth2ServiceProvider extends PackageServiceProvider
 
         // Testing
         Testable::mixin(new TestsFilamentOauth2);
-    }
-
-    protected function getAssetPackageName(): ?string
-    {
-        return 'alexandergabriel/filament-oauth2';
-    }
-
-    /**
-     * @return array<Asset>
-     */
-    protected function getAssets(): array
-    {
-        return [
-            // AlpineComponent::make('filament-oauth2', __DIR__ . '/../resources/dist/components/filament-oauth2.js'),
-            Css::make('filament-oauth2-styles', __DIR__ . '/../resources/dist/filament-oauth2.css'),
-            Js::make('filament-oauth2-scripts', __DIR__ . '/../resources/dist/filament-oauth2.js'),
-        ];
     }
 
     /**
@@ -119,34 +77,9 @@ class FilamentOauth2ServiceProvider extends PackageServiceProvider
     /**
      * @return array<string>
      */
-    protected function getIcons(): array
-    {
-        return [];
-    }
-
-    /**
-     * @return array<string>
-     */
     protected function getRoutes(): array
     {
         return [];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    protected function getScriptData(): array
-    {
-        return [];
-    }
-
-    /**
-     * @return array<string>
-     */
-    protected function getMigrations(): array
-    {
-        return [
-            'create_filament-oauth2_table',
-        ];
-    }
 }

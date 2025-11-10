@@ -2,6 +2,7 @@
 
 namespace AlexanderGabriel\FilamentOauth2;
 
+use AlexanderGabriel\FilamentOauth2\Facades\FilamentOauth2;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 
@@ -14,7 +15,7 @@ class FilamentOauth2Plugin implements Plugin
 
     public function register(Panel $panel): void
     {
-        //
+        $panel->login(FilamentOauth2::getLoginRouteAction());
     }
 
     public function boot(Panel $panel): void
