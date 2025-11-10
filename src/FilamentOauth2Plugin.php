@@ -4,6 +4,7 @@ namespace AlexanderGabriel\FilamentOauth2;
 
 use AlexanderGabriel\FilamentOauth2\Facades\FilamentOauth2;
 use Filament\Contracts\Plugin;
+use Filament\Navigation\MenuItem;
 use Filament\Panel;
 
 class FilamentOauth2Plugin implements Plugin
@@ -15,7 +16,15 @@ class FilamentOauth2Plugin implements Plugin
 
     public function register(Panel $panel): void
     {
-        $panel->login(FilamentOauth2::getLoginRouteAction());
+        $panel
+            ->login(FilamentOauth2::getLoginRouteAction())
+            ->userMenuItems([
+                'logout' => MenuItem::make()->url(function () {
+                    $panel = filament()->getCurrentPanel();
+                    return '/'.$panel->getPath().'/'.$this->getId().'/handleLogout';
+                }),
+            ]);
+
     }
 
     public function boot(Panel $panel): void

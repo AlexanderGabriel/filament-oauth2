@@ -15,12 +15,11 @@ Route::prefix($panel->getPath())
         Route::name('filament-oauth2.')
             ->prefix('filament-oauth2')
             ->group(function () {
+                Route::post('handleLogout', [Oauth2Controller::class, 'handleLogout'])->name('handleLogout');
                 Route::get('redirectToOauth2Server', [Oauth2Controller::class, 'redirectToOauth2Server'])
                     ->name('redirectToOauth2Server');
                 Route::get('handleCallback', [Oauth2Controller::class, 'handleCallback'])
                     ->name('handleCallback');
             });
 
-    });
-
-
+});
