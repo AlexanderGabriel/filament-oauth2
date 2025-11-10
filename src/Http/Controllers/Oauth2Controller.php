@@ -76,7 +76,7 @@ class Oauth2Controller extends Controller
                 if($roles) $hasRoles = true;
             }
             catch (Exception $e) {
-                //keine Rollen... Nichts tun...
+                //No Roles. Nothing to do
             }
             if($hasRoles && config('filament-oauth2.updateRoles') != false) {
                 //Are there roles in the Token?
@@ -129,8 +129,12 @@ class Oauth2Controller extends Controller
         ]);
     }
 
-    //TODO: Logout
-    // filament-oauth2-demo/vendor/filament/filament/src/Http/Controllers/Auth/LogoutController.php
-
-
+    public function handleLogout(Request $request)
+    {
+        session()->invalidate();
+        session()->regenerateToken();
+        Filament::auth()->logout();
+        $logoutUrl = config('filament-oauth2.urlLogout').'?client_id=filamentphp';
+        return redirect($logoutUrl);
+    }
 }
