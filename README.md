@@ -17,38 +17,73 @@ You can install the package via composer:
 composer require alexandergabriel/filament-oauth2
 ```
 
-You can publish and run the migrations with:
-
-```bash
-php artisan vendor:publish --tag="filament-oauth2-migrations"
-php artisan migrate
-```
-
 You can publish the config file with:
 
 ```bash
 php artisan vendor:publish --tag="filament-oauth2-config"
-```
-
-Optionally, you can publish the views using
-
-```bash
-php artisan vendor:publish --tag="filament-oauth2-views"
-```
-
 This is the contents of the published config file:
 
 ```php
 return [
+    'clientId' => env("OAUTH2_CLIENT_ID"),
+    'clientSecret' => env("OAUTH2_CLIENT_SECRET"),
+    'baseUrl' => env("OAUTH2_BASE_URL"), // https://DOMAIN/realms/REALM/protocol/openid-connect
+    'urlAuthorize' => env("OAUTH2_URL_AUTHORIZE", env("OAUTH2_BASE_URL")."/auth"),
+    'urlAccessToken' => env("OAUTH2_URL_ACCESS_TOKEN", env("OAUTH2_BASE_URL")."/token"),
+    'urlResourceOwnerDetails' => env("OAUTH2_URL_RESOURCE_OWNER_DETAILS", env("OAUTH2_BASE_URL")."/userinfo"),
+    'urlLogout' => env("OAUTH2_URL_LOGOUT", env("OAUTH2_BASE_URL")."/logout"),
+    'urlAfterlogout' => env("OAUTH2_URL_AFTER_LOGOUT", url('/')),
+    'scopes' => env("OAUTH2_SCOPES", "profile email openid"),
+    'updateRoles' => env("OAUTH2_UPDATE_ROLES", false)
 ];
 ```
 
 ## Usage
 
+Load Plugin in your PanelProvider under filament-oauth2-demo/app/Providers/Filament:
 ```php
-$filamentOauth2 = new AlexanderGabriel\FilamentOauth2();
-echo $filamentOauth2->echoPhrase('Hello, AlexanderGabriel!');
+class YOURPanelProvider extends PanelProvider
+{
+    public function panel(Panel $panel): Panel
+    {
+        return $panel
+            ->plugin(
+                new FilamentOauth2Plugin()
+            )
 ```
+
+
+### To configure, add some config to your .env:
+
+- OAUTH2_CLIENT_ID*
+    - OAuth2 client id, mandatory
+- OAUTH2_CLIENT_SECRET*
+    - OAuth2 client secret, mandatory
+- OAUTH2_BASE_URL*
+    - Base url to OAuth2 authentication server
+    - must include realm: https://DOMAIN/realms/REALM/protocol/openid-connect
+- OAUTH2_URL_AUTHORIZE
+    - authorization url
+    - defaults to OAUTH2_BASE_URL+/auth
+- OAUTH2_URL_ACCESS_TOKEN
+    - token url
+    - defaults to OAUTH2_BASE_URL+/token
+- OAUTH2_URL_RESOURCE_OWNER_DETAILS
+    - resource owner details url
+    - defaults to OAUTH2_BASE_URL+/userinfo
+    - todo: needed?
+- OAUTH2_URL_LOGOUT
+    - logout url
+    - defaults to OAUTH2_BASE_URL+/logout
+- OAUTH2_URL_AFTER_LOGOUT
+    - post_logout_redirect_uri
+    - defaults to base url of Laravel app (without panel)
+- OAUTH2_SCOPES
+    - scopes
+    - defaults to "profile email openid"
+- OAUTH2_UPDATE_ROLES
+    - look for roles in token and update/create and map them
+    - defaults to false
 
 ## Testing
 
