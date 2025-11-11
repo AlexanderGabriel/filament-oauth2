@@ -5,7 +5,7 @@ namespace AlexanderGabriel\FilamentOauth2\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\User;
-use Dotenv\Exception\ValidationException;
+use Illuminate\Validation\ValidationException;
 use Exception;
 use Filament\Facades\Filament;
 use Filament\Http\Responses\Auth\LoginResponse;
