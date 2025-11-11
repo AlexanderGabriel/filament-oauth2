@@ -11,6 +11,7 @@ return [
     'urlAccessToken' => env("OAUTH2_URL_ACCESS_TOKEN", env("OAUTH2_BASE_URL")."/token"),
     'urlResourceOwnerDetails' => env("OAUTH2_URL_RSOURCE_OWNER_DETAILS", env("OAUTH2_BASE_URL")."/userinfo"),
     'urlLogout' => env("OAUTH2_URL_LOGOUT", env("OAUTH2_BASE_URL")."/logout"),
+    'urlAfterlogout' => env("OAUTH2_URL_AFTER_LOGOUT", url('/admin')),
     'scopes' => env("OAUTH2_SCOPES", "profile email openid"),
     'updateRoles' => env("OAUTH2_UPDATE_ROLES", false)
 

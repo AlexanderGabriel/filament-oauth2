@@ -141,10 +141,12 @@ class Oauth2Controller extends Controller
 
     public function handleLogout(Request $request)
     {
+        // https://openid.net/specs/openid-connect-rpinitiated-1_0.html
         session()->invalidate();
         session()->regenerateToken();
         Filament::auth()->logout();
         $logoutUrl = config('filament-oauth2.urlLogout').'?client_id=filamentphp';
+        if(config('filament-oauth2.urlAfterlogout') != url('/')) $logoutUrl .= '&post_logout_redirect_uri='.config('filament-oauth2.urlAfterlogout');
         return redirect($logoutUrl);
     }
 }
