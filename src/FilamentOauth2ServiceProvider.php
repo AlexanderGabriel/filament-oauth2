@@ -51,15 +51,6 @@ class FilamentOauth2ServiceProvider extends PackageServiceProvider
 
     public function packageBooted(): void
     {
-        // Handle Stubs
-        if (app()->runningInConsole()) {
-            foreach (app(Filesystem::class)->files(__DIR__ . '/../stubs/') as $file) {
-                $this->publishes([
-                    $file->getRealPath() => base_path("stubs/filament-oauth2/{$file->getFilename()}"),
-                ], 'filament-oauth2-stubs');
-            }
-        }
-
         // Testing
         Testable::mixin(new TestsFilamentOauth2);
     }
