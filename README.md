@@ -5,9 +5,31 @@
 [![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/alexandergabriel/filament-oauth2/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/alexandergabriel/filament-oauth2/actions?query=workflow%3A"Fix+PHP+code+styling"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/alexandergabriel/filament-oauth2.svg?style=flat-square)](https://packagist.org/packages/alexandergabriel/filament-oauth2)
 
+> !!!  
+> This Plugin is still under development and only tested with Keycloak.  
+> This is my first FilamentPHP-Plugin.  
+> Did not write any tests, not published to packagist yet...  
+> Feedback welcome.  
+> !!!  
 
+To be able to install you have to add/change this to/in your composer.json:
+```json
+{
+    "minimum-stability": "dev",
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/AlexanderGabriel/filament-oauth2"
+        }
+    ]
+}
+```
 
-This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
+This Plugin enables OAuth2-Login for [FilamentPHP](https://filamentphp.com) Panels.  
+Login and logout is done by OAuth2-Server.  
+If the OAuth2-Server provides roles for your client, they will be mapped to the App\Models\Role-Model  
+Non-existing Roles will be created.
+Users will be detached to roles not in the access token any more.
 
 ## Installation
 
@@ -106,6 +128,7 @@ Please review [our security policy](../../security/policy) on how to report secu
 
 ## Credits
 
+- To all helping developing and keeping alive FilamentPHP, PHP, OAuth2 and the OpenSource Ecosystem!
 - [Alexander Gabriel](https://github.com/AlexanderGabriel)
 - [All Contributors](../../contributors)
 
