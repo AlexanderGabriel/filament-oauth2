@@ -1,6 +1,6 @@
 {
     "name": "alexandergabriel/filament-oauth2",
-    "description": "This is my package filament-oauth2",
+    "description": "Enable OAuth2 Authentication to FilamentPHP Panels",
     "keywords": [
         "AlexanderGabriel",
         "laravel",
