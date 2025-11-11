@@ -10,14 +10,17 @@ use Exception;
 use Filament\Facades\Filament;
 use Filament\Http\Responses\Auth\LoginResponse;
 use Filament\Models\Contracts\FilamentUser;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
 use League\OAuth2\Client\Provider\GenericProvider;
-use League\OAuth2\Client\Token\AccessToken;
 
 class Oauth2Controller extends Controller
 {
     private GenericProvider $oauth2Provider;
+    private Model $user;
+    private $accessToken;
+    private $oauth2User;
 
     public function __construct()
     {
@@ -41,84 +44,91 @@ class Oauth2Controller extends Controller
     public function handleCallback(Request $request)
     {
         try {
-            $accessToken = $this->oauth2Provider->getAccessToken('authorization_code', ['code' => $request->input('code')]);
-            $oauth2User = $this->oauth2Provider->getResourceOwner($accessToken)->toArray();
+            $this->accessToken = $this->oauth2Provider->getAccessToken('authorization_code', ['code' => $request->input('code')]);
+            $this->oauth2User = $this->oauth2Provider->getResourceOwner($this->accessToken)->toArray();
             
-            $user = User::firstOrCreate([
-                'email' =>  $oauth2User['email'],
+            // Create the user if it does not exist
+            $this->user = User::firstOrCreate([
+                'email' =>  $this->oauth2User['email'],
             ],[
-                'name' =>  $oauth2User['name'],
+                'name' =>  $this->oauth2User['name'],
+                // Todo -> is there a better way?
                 'password' =>  'nonsense'
             ]);
-            if($user->name != $oauth2User['name']) 
+
+            // Update user data if different from Oauth2-Server
+            if($this->user->name != $this->oauth2User['name']) 
             {
-                $user->name = $oauth2User['name'];
-                $user->save();
+                $this->user->name = $this->oauth2User['name'];
+                $this->user->save();
             }
 
-            Filament::auth()->loginUsingId($user->id, false);
+            // Login User by id
+            Filament::auth()->loginUsingId($this->user->id, false);
 
+            // Taken from original LoginClass...
             if (
-                ($user instanceof FilamentUser) &&
-                (! $user->canAccessPanel(Filament::getCurrentPanel()))
+                ($this->user instanceof FilamentUser) &&
+                (! $this->user->canAccessPanel(Filament::getCurrentPanel()))
             ) {
                 Filament::auth()->logout();
-
                 $this->throwFailureValidationException();
             }
 
             session()->regenerate();
 
-            //Should i update Roles and are there roles?
-            $hasRoles = false;
-            try {
-                $roles = $user->roles();
-                if($roles) $hasRoles = true;
-            }
-            catch (Exception $e) {
-                //No Roles. Nothing to do
-            }
-            if($hasRoles && config('filament-oauth2.updateRoles') != false) {
-                //Are there roles in the Token?
-                $accessToken = explode(".", $accessToken);
-                if(isset($accessToken[1])) {
-                    $accessToken = json_decode(base64_decode($accessToken[1]));
-                    $clientId = config('filament-oauth2.clientId');
-                    if(isset($accessToken->resource_access) && isset($accessToken->resource_access->$clientId)) {
-                        // Roles are defined. Maybe empty to remove all Roles from user
-                        // TODO: test
-                        if(!isset($accessToken->resource_access->$clientId->roles)) $roles = [];
-                        else $roles = $accessToken->resource_access->$clientId->roles;
-
-                        $userRoles = $user->roles();
-
-                        //disconnect roles
-                        foreach ($userRoles as $userRole) {
-                            if(!in_array($userRole, $roles)) {
-                                $user->roles()->detach($userRole);
-                            }
-                        }
-
-                        // connect or create roles
-                        foreach($roles as $role) {
-                            $existingRole = Role::first('name', '=', $role);
-                            if($existingRole) {
-                                $user->roles()->attach($existingRole->id);
-                            } else {
-                                $newRole = Role::create(['name' => $role]);
-                                $newRole->save();
-                                $user->roles()->attach($newRole);
-                            }
-                        }
-
-                    }
-                }
-            }
+            // Handle Role Mapping
+            $this->handleRoleMapping();
 
             return app(LoginResponse::class);
 
         } catch (IdentityProviderException $e) {
             dd($e->getMessage());
+        }
+    }
+
+    protected function handleRoleMapping(): void
+    {
+        if(config('filament-oauth2.updateRoles') != false) {
+            try {
+                $roles = $this->user->roles();
+                if($roles) {
+                    // Are there roles in the Token?
+                    $this->accessToken = explode(".", $this->accessToken);
+                    if(isset($this->accessToken[1])) {
+                        $this->accessToken = json_decode(base64_decode($this->accessToken[1]));
+                        $clientId = config('filament-oauth2.clientId');
+                        if(isset($this->accessToken->resource_access) && isset($this->accessToken->resource_access->$clientId)) {
+                            // Roles are defined. Maybe empty to remove all Roles from user
+                            // TODO: test this without roles
+                            if(!isset($this->accessToken->resource_access->$clientId->roles)) $roles = [];
+                            else $roles = $this->accessToken->resource_access->$clientId->roles;
+                            $userRoles = $this->user->roles();
+                            // Disconnect roles not in the access token any more
+                            foreach ($userRoles as $userRole) {
+                                if(!in_array($userRole, $roles)) {
+                                    $this->user->roles()->detach($userRole);
+                                }
+                            }
+                            // Connect or create roles
+                            foreach($roles as $role) {
+                                $existingRole = Role::first('name', '=', $role);
+                                if($existingRole) {
+                                    $this->user->roles()->attach($existingRole->id);
+                                } else {
+                                    $newRole = Role::create(['name' => $role]);
+                                    // needed?
+                                    $newRole->save();
+                                    $this->user->roles()->attach($newRole);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception $e) {
+                // No Roles. Nothing to do
+            }
         }
     }
 
