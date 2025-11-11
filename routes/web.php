@@ -6,7 +6,7 @@ use AlexanderGabriel\FilamentOauth2\Http\Controllers\Oauth2Controller;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Route;
 
-$panel = Filament::getCurrentPanel();
+$panel = Filament::getCurrentOrDefaultPanel();
 
 Route::prefix($panel->getPath())
     ->middleware($panel->getMiddleware())
@@ -15,7 +15,7 @@ Route::prefix($panel->getPath())
         Route::name('filament-oauth2.')
             ->prefix('filament-oauth2')
             ->group(function () {
-                Route::post('handleLogout', [Oauth2Controller::class, 'handleLogout'])->name('handleLogout');
+                Route::get('handleLogout', [Oauth2Controller::class, 'handleLogout'])->name('handleLogout');
                 Route::get('redirectToOauth2Server', [Oauth2Controller::class, 'redirectToOauth2Server'])
                     ->name('redirectToOauth2Server');
                 Route::get('handleCallback', [Oauth2Controller::class, 'handleCallback'])
