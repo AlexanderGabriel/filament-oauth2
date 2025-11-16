@@ -22,4 +22,4 @@ Route::prefix($panel->getPath())
                     ->name('handleCallback');
             });
 
-});
+    });

@@ -21,7 +21,8 @@ class FilamentOauth2Plugin implements Plugin
             ->userMenuItems([
                 'logout' => MenuItem::make()->url(function () {
                     $panel = filament()->getCurrentPanel();
-                    return '/'.$panel->getPath().'/'.$this->getId().'/handleLogout';
+
+                    return '/' . $panel->getPath() . '/' . $this->getId() . '/handleLogout';
                 }),
             ]);
 

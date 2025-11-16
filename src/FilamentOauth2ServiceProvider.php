@@ -2,13 +2,12 @@
 
 namespace AlexanderGabriel\FilamentOauth2;
 
-use Illuminate\Filesystem\Filesystem;
+use AlexanderGabriel\FilamentOauth2\Commands\FilamentOauth2Command;
+use AlexanderGabriel\FilamentOauth2\Testing\TestsFilamentOauth2;
 use Livewire\Features\SupportTesting\Testable;
 use Spatie\LaravelPackageTools\Commands\InstallCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use AlexanderGabriel\FilamentOauth2\Commands\FilamentOauth2Command;
-use AlexanderGabriel\FilamentOauth2\Testing\TestsFilamentOauth2;
 
 class FilamentOauth2ServiceProvider extends PackageServiceProvider
 {
@@ -72,5 +71,4 @@ class FilamentOauth2ServiceProvider extends PackageServiceProvider
     {
         return [];
     }
-
 }
