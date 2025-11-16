@@ -83,7 +83,7 @@ class Oauth2Controller extends Controller
             return app(LoginResponse::class);
 
         } catch (IdentityProviderException $e) {
-            dd($e->getMessage());
+            throw($e);
         }
     }
 
@@ -135,7 +135,7 @@ class Oauth2Controller extends Controller
     protected function throwFailureValidationException(): never
     {
         throw ValidationException::withMessages([
-            'data.email' => __('filament-panels::pages/auth/login.messages.failed'),
+            'data.email' => __('filament-panels::auth/pages/login.messages.failed'),
         ]);
     }
 
