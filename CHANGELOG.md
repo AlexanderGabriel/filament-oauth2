@@ -2,6 +2,10 @@
 
 All notable changes to `filament-oauth2` will be documented in this file.
 
+## v1.0.1 - 2025-11-16
+
+**Full Changelog**: https://github.com/AlexanderGabriel/filament-oauth2/compare/v1.0.0...v1.0.1
+
 ## v1.0.0 - 2025-11-16
 
 Released Version 1.0.0
