@@ -8,22 +8,8 @@
 > !!!  
 > This Plugin is still under development and only tested with Keycloak.  
 > This is my first FilamentPHP-Plugin.  
-> Did not write any tests, not published to packagist yet...  
 > Feedback welcome.  
 > !!!  
-
-To be able to install you have to add/change this to/in your composer.json:
-```json
-{
-    "minimum-stability": "dev",
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/AlexanderGabriel/filament-oauth2"
-        }
-    ]
-}
-```
 
 This Plugin enables OAuth2-Login for [FilamentPHP](https://filamentphp.com) Panels.  
 Login and logout is done by OAuth2-Server.  
@@ -108,11 +94,6 @@ class YOURPanelProvider extends PanelProvider
     - look for roles in token and update/create and map them
     - defaults to false
 
-## Testing
-
-```bash
-composer test
-```
 
 ## Changelog
 
