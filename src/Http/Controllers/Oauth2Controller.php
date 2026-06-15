@@ -149,7 +149,7 @@ class Oauth2Controller extends Controller
         session()->invalidate();
         session()->regenerateToken();
         Filament::auth()->logout();
-        $logoutUrl = config('filament-oauth2.urlLogout') . '?client_id=filamentphp';
+        $logoutUrl = config('filament-oauth2.urlLogout') . '?client_id='.env('OAUTH2_CLIENT_ID');
         if (config('filament-oauth2.urlAfterlogout') != url('/')) {
             $logoutUrl .= '&post_logout_redirect_uri=' . config('filament-oauth2.urlAfterlogout');
         }
