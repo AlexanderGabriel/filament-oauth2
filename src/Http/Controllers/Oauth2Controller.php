@@ -93,8 +93,8 @@ class Oauth2Controller extends Controller
     {
         if (config('filament-oauth2.updateRoles') != false) {
             try {
-                $roles = $this->user->roles();
-                if ($roles) {
+                $userRoles = $this->user->roles();
+                if ($userRoles) {
                     // Are there roles in the Token?
                     $this->accessToken = explode('.', $this->accessToken);
                     if (isset($this->accessToken[1])) {
@@ -108,30 +108,31 @@ class Oauth2Controller extends Controller
                             } else {
                                 $roles = $this->accessToken->resource_access->$clientId->roles;
                             }
-                            $userRoles = $this->user->roles();
                             // Disconnect roles not in the access token any more
-                            foreach ($userRoles as $userRole) {
+                            foreach ($userRoles->get()->pluck('name')->toArray() as $userRole) {
                                 if (! in_array($userRole, $roles)) {
-                                    $this->user->roles()->detach($userRole);
+                                    $this->user->roles()->detach(Role::where('name', $userRole)->first()->id);
                                 }
                             }
                             // Connect or create roles
                             foreach ($roles as $role) {
-                                $existingRole = Role::first('name', '=', $role);
-                                if ($existingRole) {
-                                    $this->user->roles()->attach($existingRole->id);
-                                } else {
-                                    $newRole = Role::create(['name' => $role]);
-                                    // needed?
-                                    $newRole->save();
-                                    $this->user->roles()->attach($newRole);
+                                if(!in_array($role, $this->user->roles->pluck('name')->toArray())) {
+                                    $existingRole = Role::where('name', $role)->exists();
+                                    if ($existingRole) {
+                                        $this->user->roles()->attach(Role::where('name', $role)->first());
+                                    } else {
+                                        $newRole = Role::create(['name' => $role]);
+                                        // needed?
+                                        $newRole->save();
+                                        $this->user->roles()->attach($newRole);
+                                    }
                                 }
                             }
                         }
                     }
                 }
             } catch (Exception $e) {
-                // No Roles. Nothing to do
+                dd($e);
             }
         }
     }
