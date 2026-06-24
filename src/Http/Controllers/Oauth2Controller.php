@@ -48,6 +48,7 @@ class Oauth2Controller extends Controller
     {
         try {
             $this->accessToken = $this->oauth2Provider->getAccessToken('authorization_code', ['code' => $request->input('code')]);
+            $this->accessTokenDecoded =json_decode(base64_decode(explode('.', $this->accessToken)[1]));
             $this->oauth2User = $this->oauth2Provider->getResourceOwner($this->accessToken)->toArray();
 
             // Create the user if it does not exist
@@ -58,12 +59,18 @@ class Oauth2Controller extends Controller
                 // Todo -> is there a better way?
                 'password' => 'nonsense',
             ]);
+            $saveUser = false;
+            if($this->user->hasAttribute('username') && $this->user->username != $this->accessTokenDecoded->preferred_username) {
+                $this->user->username = $this->accessTokenDecoded->preferred_username;
+                $saveUser = true;
+            }
 
             // Update user data if different from Oauth2-Server
             if ($this->user->name != $this->oauth2User['name']) {
                 $this->user->name = $this->oauth2User['name'];
-                $this->user->save();
+                $saveUser = true;
             }
+            if($saveUser) $this->user->save();
 
             // Login User by id
             Filament::auth()->loginUsingId($this->user->id, false);
