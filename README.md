@@ -17,6 +17,13 @@ If the OAuth2-Server provides roles for your client, they will be mapped to the 
 Non-existing Roles will be created.
 Users will be detached to roles not in the access token any more.
 
+### Filament Shield
+
+If [Filament Shield](https://github.com/bezhanSalleh/filament-shield) is installed and your user model uses
+Shields `HasRoles`-trait, the roles from the access token are synced to the Shield/spatie roles instead of the
+App\Models\Role-Model. Roles are created with the auth guard of the panel, so they show up in Shields
+role resource and can be given permissions there.
+
 ## Installation
 
 You can install the package via composer:
@@ -92,6 +99,7 @@ class YOURPanelProvider extends PanelProvider
     - defaults to "profile email openid"
 - OAUTH2_UPDATE_ROLES
     - look for roles in token and update/create and map them
+    - uses Filament Shield if it is installed, App\Models\Role otherwise
     - defaults to false
 
 

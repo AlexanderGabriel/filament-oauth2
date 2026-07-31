@@ -38,6 +38,9 @@
         "phpstan/phpstan-deprecation-rules": "^2.0.3",
         "phpstan/phpstan-phpunit": "^2.0.8"
     },
+    "suggest": {
+        "bezhansalleh/filament-shield": "Sync the roles from the access token to the roles of Filament Shield"
+    },
     "autoload": {
         "psr-4": {
             "AlexanderGabriel\\FilamentOauth2\\": "src/"

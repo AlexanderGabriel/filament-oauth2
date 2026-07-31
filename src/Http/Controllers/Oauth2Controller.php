@@ -17,11 +17,18 @@ use League\OAuth2\Client\Provider\GenericProvider;
 
 class Oauth2Controller extends Controller
 {
+    /**
+     * Filament Shield is an optional dependency, so it is only referenced by name.
+     */
+    private const SHIELD_UTILS = '\BezhanSalleh\FilamentShield\Support\Utils';
+
     private GenericProvider $oauth2Provider;
 
     private Model $user;
 
     private $accessToken;
+
+    private $accessTokenDecoded;
 
     private $oauth2User;
 
@@ -48,7 +55,7 @@ class Oauth2Controller extends Controller
     {
         try {
             $this->accessToken = $this->oauth2Provider->getAccessToken('authorization_code', ['code' => $request->input('code')]);
-            $this->accessTokenDecoded =json_decode(base64_decode(explode('.', $this->accessToken)[1]));
+            $this->accessTokenDecoded = $this->decodeAccessToken();
             $this->oauth2User = $this->oauth2Provider->getResourceOwner($this->accessToken)->toArray();
 
             // Create the user if it does not exist
@@ -60,7 +67,7 @@ class Oauth2Controller extends Controller
                 'password' => 'nonsense',
             ]);
             $saveUser = false;
-            if($this->user->hasAttribute('username') && $this->user->username != $this->accessTokenDecoded->preferred_username) {
+            if($this->user->hasAttribute('username') && isset($this->accessTokenDecoded->preferred_username) && $this->user->username != $this->accessTokenDecoded->preferred_username) {
                 $this->user->username = $this->accessTokenDecoded->preferred_username;
                 $saveUser = true;
             }
@@ -96,50 +103,112 @@ class Oauth2Controller extends Controller
         }
     }
 
+    /**
+     * The payload of the access token, if it is a JWT.
+     */
+    protected function decodeAccessToken(): ?object
+    {
+        $payload = explode('.', (string) $this->accessToken)[1] ?? null;
+        if ($payload === null) {
+            return null;
+        }
+
+        $decoded = json_decode(base64_decode(strtr($payload, '-_', '+/')));
+
+        return is_object($decoded) ? $decoded : null;
+    }
+
     protected function handleRoleMapping(): void
     {
-        if (config('filament-oauth2.updateRoles') != false) {
-            try {
-                $userRoles = $this->user->roles();
-                if ($userRoles) {
-                    // Are there roles in the Token?
-                    $this->accessToken = explode('.', $this->accessToken);
-                    if (isset($this->accessToken[1])) {
-                        $this->accessToken = json_decode(base64_decode($this->accessToken[1]));
-                        $clientId = config('filament-oauth2.clientId');
-                        if (isset($this->accessToken->resource_access) && isset($this->accessToken->resource_access->$clientId)) {
-                            // Roles are defined. Maybe empty to remove all Roles from user
-                            // TODO: test this without roles
-                            if (! isset($this->accessToken->resource_access->$clientId->roles)) {
-                                $roles = [];
-                            } else {
-                                $roles = $this->accessToken->resource_access->$clientId->roles;
-                            }
-                            // Disconnect roles not in the access token any more
-                            foreach ($userRoles->get()->pluck('name')->toArray() as $userRole) {
-                                if (! in_array($userRole, $roles)) {
-                                    $this->user->roles()->detach(Role::where('name', $userRole)->first()->id);
-                                }
-                            }
-                            // Connect or create roles
-                            foreach ($roles as $role) {
-                                if(!in_array($role, $this->user->roles->pluck('name')->toArray())) {
-                                    $existingRole = Role::where('name', $role)->exists();
-                                    if ($existingRole) {
-                                        $this->user->roles()->attach(Role::where('name', $role)->first());
-                                    } else {
-                                        $newRole = Role::create(['name' => $role]);
-                                        // needed?
-                                        $newRole->save();
-                                        $this->user->roles()->attach($newRole);
-                                    }
-                                }
-                            }
-                        }
-                    }
+        if (config('filament-oauth2.updateRoles') == false) {
+            return;
+        }
+
+        try {
+            $roles = $this->getRolesFromAccessToken();
+            // No roles claim at all: leave the roles of the user untouched
+            if ($roles === null) {
+                return;
+            }
+
+            if ($this->usesFilamentShield()) {
+                $this->syncShieldRoles($roles);
+            } else {
+                $this->syncRoles($roles);
+            }
+        } catch (Exception $e) {
+            report($e);
+        }
+    }
+
+    /**
+     * Roles the Oauth2-Server provides for this client.
+     *
+     * Returns null if the token does not contain a roles claim for the client,
+     * an (possibly empty) array of role names otherwise. An empty array removes
+     * all roles from the user.
+     */
+    protected function getRolesFromAccessToken(): ?array
+    {
+        $clientId = config('filament-oauth2.clientId');
+        $resourceAccess = $this->accessTokenDecoded->resource_access ?? null;
+
+        if (! isset($resourceAccess->$clientId)) {
+            return null;
+        }
+
+        return (array) ($resourceAccess->$clientId->roles ?? []);
+    }
+
+    /**
+     * Filament Shield keeps its roles in the spatie/laravel-permission models,
+     * so its role handling has to be used instead of the plain roles()-relation.
+     */
+    protected function usesFilamentShield(): bool
+    {
+        return class_exists(self::SHIELD_UTILS) && method_exists($this->user, 'syncRoles');
+    }
+
+    protected function syncShieldRoles(array $roles): void
+    {
+        $shield = self::SHIELD_UTILS;
+
+        // Non-existing roles are created, so they can be given permissions in Shield.
+        // Shield takes care of the guard configured for the panel.
+        $roles = array_map(
+            fn (string $role) => $shield::createRole($role),
+            $roles
+        );
+
+        // Roles not in the access token any more are removed from the user
+        $this->user->syncRoles($roles);
+    }
+
+    protected function syncRoles(array $roles): void
+    {
+        $userRoles = $this->user->roles();
+        if (! $userRoles) {
+            return;
+        }
+
+        // Disconnect roles not in the access token any more
+        foreach ($userRoles->get()->pluck('name')->toArray() as $userRole) {
+            if (! in_array($userRole, $roles)) {
+                $this->user->roles()->detach(Role::where('name', $userRole)->first()->id);
+            }
+        }
+        // Connect or create roles
+        foreach ($roles as $role) {
+            if (! in_array($role, $this->user->roles->pluck('name')->toArray())) {
+                $existingRole = Role::where('name', $role)->exists();
+                if ($existingRole) {
+                    $this->user->roles()->attach(Role::where('name', $role)->first());
+                } else {
+                    $newRole = Role::create(['name' => $role]);
+                    // needed?
+                    $newRole->save();
+                    $this->user->roles()->attach($newRole);
                 }
-            } catch (Exception $e) {
-                //
             }
         }
     }
