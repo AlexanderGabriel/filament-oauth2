@@ -2,6 +2,10 @@
 
 All notable changes to `filament-oauth2` will be documented in this file.
 
+## v1.0.7 - 2026-08-03
+
+connect to shield-roles
+
 ## v1.0.6 - 2026-06-24
 
 **Full Changelog**: https://github.com/AlexanderGabriel/filament-oauth2/compare/v1.0.5...v1.0.6
