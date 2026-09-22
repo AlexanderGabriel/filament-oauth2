@@ -101,7 +101,8 @@ class YOURPanelProvider extends PanelProvider
     - look for roles in token and update/create and map them
     - uses Filament Shield if it is installed, App\Models\Role otherwise
     - defaults to false
-
+- OAUTH2_VERIFY_SSL
+    - disable or enable ssl-verification of keycloak-server (for test/dev-env)
 
 ## Changelog
 

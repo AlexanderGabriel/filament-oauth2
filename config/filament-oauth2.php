@@ -13,4 +13,5 @@ return [
     'urlAfterlogout' => env('OAUTH2_URL_AFTER_LOGOUT', '/'),
     'scopes' => env('OAUTH2_SCOPES', 'profile email openid'),
     'updateRoles' => env('OAUTH2_UPDATE_ROLES', false),
+    'verifySsl' => env('OAUTH2_VERIFY_SSL', true),
 ];

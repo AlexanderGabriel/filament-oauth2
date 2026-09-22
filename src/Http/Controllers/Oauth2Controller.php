@@ -35,6 +35,9 @@ class Oauth2Controller extends Controller
     public function __construct()
     {
         // https://oauth2-client.thephpleague.com/usage/
+        // The httpClient collaborator is passed explicitly (instead of a
+        // 'verify' option) because AbstractProvider only allows 'verify'
+        // through to Guzzle when a 'proxy' option is also set.
         $this->oauth2Provider = new GenericProvider([
             'clientId' => config('filament-oauth2.clientId'),    // The client ID assigned to you by the provider
             'clientSecret' => config('filament-oauth2.clientSecret'),    // The client password assigned to you by the provider
@@ -43,9 +46,10 @@ class Oauth2Controller extends Controller
             'urlAccessToken' => config('filament-oauth2.urlAccessToken'),
             'urlResourceOwnerDetails' => config('filament-oauth2.urlResourceOwnerDetails'),
             'scopes' => config('filament-oauth2.scopes'),
+        ], [
+            'httpClient' => new HttpClient(['verify' => config('filament-oauth2.verifySsl', true)]),
         ]);
     }
-
     public function redirectToOauth2Server()
     {
         return redirect($this->oauth2Provider->getAuthorizationUrl());
