@@ -9,6 +9,7 @@ use Exception;
 use Filament\Auth\Http\Responses\LoginResponse;
 use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
+use GuzzleHttp\Client as HttpClient;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
