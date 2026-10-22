@@ -2,15 +2,16 @@
 
 namespace AlexanderGabriel\FilamentOauth2\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Models\Role;
-use App\Models\User;
-use Filament\Auth\Http\Responses\LoginResponse;
+use AlexanderGabriel\FilamentOauth2\FilamentOauth2Plugin;
+use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
 use GuzzleHttp\Client as HttpClient;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
@@ -29,34 +30,36 @@ class Oauth2Controller extends Controller
 
     private const SESSION_PKCE_CODE = 'filament-oauth2.pkceCode';
 
-    private GenericProvider $oauth2Provider;
-
-    private Model $user;
-
-    private $accessToken;
-
-    private $accessTokenDecoded;
-
-    private $oauth2User;
-
-    public function __construct()
+    /**
+     * Created on use, because the current panel is not known when the
+     * controller is constructed (before the middleware ran).
+     */
+    protected function oauth2Provider(): GenericProvider
     {
         // https://oauth2-client.thephpleague.com/usage/
         // The httpClient collaborator is passed explicitly (instead of a
         // 'verify' option) because AbstractProvider only allows 'verify'
         // through to Guzzle when a 'proxy' option is also set.
-        $this->oauth2Provider = app()->make(GenericProvider::class, ['options' => [
-            'clientId' => config('filament-oauth2.clientId'),    // The client ID assigned to you by the provider
-            'clientSecret' => config('filament-oauth2.clientSecret'),    // The client password assigned to you by the provider
-            'redirectUri' => route('filament-oauth2.handleCallback'),
-            'urlAuthorize' => config('filament-oauth2.urlAuthorize'),
-            'urlAccessToken' => config('filament-oauth2.urlAccessToken'),
-            'urlResourceOwnerDetails' => config('filament-oauth2.urlResourceOwnerDetails'),
-            'scopes' => config('filament-oauth2.scopes'),
+        return app()->make(GenericProvider::class, ['options' => [
+            'clientId' => $this->config('clientId'),    // The client ID assigned to you by the provider
+            'clientSecret' => $this->config('clientSecret'),    // The client password assigned to you by the provider
+            'redirectUri' => Filament::getCurrentOrDefaultPanel()->route('filament-oauth2.handleCallback'),
+            'urlAuthorize' => $this->config('urlAuthorize'),
+            'urlAccessToken' => $this->config('urlAccessToken'),
+            'urlResourceOwnerDetails' => $this->config('urlResourceOwnerDetails'),
+            'scopes' => $this->config('scopes'),
             'pkceMethod' => GenericProvider::PKCE_METHOD_S256,
         ], 'collaborators' => [
             'httpClient' => new HttpClient(['verify' => $this->verifySsl()]),
         ]]);
+    }
+
+    /**
+     * Setting of the current panel, see FilamentOauth2Plugin.
+     */
+    protected function config(string $key): mixed
+    {
+        return FilamentOauth2Plugin::get()->getConfig($key);
     }
 
     /**
@@ -74,18 +77,20 @@ class Oauth2Controller extends Controller
         return $verifySsl;
     }
 
-    public function redirectToOauth2Server()
+    public function redirectToOauth2Server(): RedirectResponse
     {
-        // State and PKCE code are only known after the authorization url is built
-        $authorizationUrl = $this->oauth2Provider->getAuthorizationUrl();
+        $oauth2Provider = $this->oauth2Provider();
 
-        session()->put(self::SESSION_STATE, $this->oauth2Provider->getState());
-        session()->put(self::SESSION_PKCE_CODE, $this->oauth2Provider->getPkceCode());
+        // State and PKCE code are only known after the authorization url is built
+        $authorizationUrl = $oauth2Provider->getAuthorizationUrl();
+
+        session()->put(self::SESSION_STATE, $oauth2Provider->getState());
+        session()->put(self::SESSION_PKCE_CODE, $oauth2Provider->getPkceCode());
 
         return redirect($authorizationUrl);
     }
 
-    public function handleCallback(Request $request)
+    public function handleCallback(Request $request): LoginResponse
     {
         // State and PKCE code are only valid for one callback
         $state = session()->pull(self::SESSION_STATE);
@@ -101,51 +106,34 @@ class Oauth2Controller extends Controller
             $this->abortLogin();
         }
 
+        $oauth2Provider = $this->oauth2Provider();
+
         try {
-            $this->oauth2Provider->setPkceCode($pkceCode);
-            $this->accessToken = $this->oauth2Provider->getAccessToken('authorization_code', ['code' => $request->query('code')]);
-            $this->accessTokenDecoded = $this->decodeAccessToken();
-            $this->oauth2User = $this->oauth2Provider->getResourceOwner($this->accessToken)->toArray();
+            $oauth2Provider->setPkceCode($pkceCode);
+            $accessToken = $oauth2Provider->getAccessToken('authorization_code', ['code' => $request->query('code')]);
+            $oauth2User = $oauth2Provider->getResourceOwner($accessToken)->toArray();
         } catch (IdentityProviderException $e) {
             report($e);
             $this->abortLogin();
         }
 
-        if (empty($this->oauth2User['email'])) {
+        $claims = $this->decodeAccessToken((string) $accessToken);
+
+        if (empty($oauth2User['email'])) {
             $this->abortLogin();
         }
 
-        // Users are linked by email, so it must not be an unverified one
-        if (($this->oauth2User['email_verified'] ?? null) === false) {
+        // Users are linked by email, so it must not be an unverified one.
+        // Some Oauth2-Servers send the flag as string ("false").
+        if (isset($oauth2User['email_verified']) && ! filter_var($oauth2User['email_verified'], FILTER_VALIDATE_BOOL)) {
             $this->abortLogin();
         }
 
-        // Create the user if it does not exist
-        $this->user = User::firstOrCreate([
-            'email' => $this->oauth2User['email'],
-        ], [
-            'name' => $this->oauth2User['name'] ?? $this->oauth2User['email'],
-            // Login is only done by the Oauth2-Server, so nobody may know the password
-            'password' => Hash::make(Str::random(64)),
-        ]);
-        $saveUser = false;
-        if ($this->user->hasAttribute('username') && isset($this->accessTokenDecoded->preferred_username) && $this->user->username != $this->accessTokenDecoded->preferred_username) {
-            $this->user->username = $this->accessTokenDecoded->preferred_username;
-            $saveUser = true;
-        }
-
-        // Update user data if different from Oauth2-Server
-        if (isset($this->oauth2User['name']) && $this->user->name != $this->oauth2User['name']) {
-            $this->user->name = $this->oauth2User['name'];
-            $saveUser = true;
-        }
-        if ($saveUser) {
-            $this->user->save();
-        }
+        $user = $this->findOrCreateUser($oauth2User, $claims);
 
         // Roles are mapped before the access check, so it is based on the current roles
         try {
-            $this->handleRoleMapping();
+            $this->handleRoleMapping($user, $claims);
         } catch (Throwable $e) {
             report($e);
             $this->abortLogin();
@@ -153,18 +141,43 @@ class Oauth2Controller extends Controller
 
         // Taken from original LoginClass...
         if (
-            ($this->user instanceof FilamentUser) &&
-            (! $this->user->canAccessPanel(Filament::getCurrentOrDefaultPanel()))
+            ($user instanceof FilamentUser) &&
+            (! $user->canAccessPanel(Filament::getCurrentOrDefaultPanel()))
         ) {
             $this->abortLogin();
         }
 
-        // Login User by id
-        Filament::auth()->loginUsingId($this->user->id, false);
+        /** @var Model&Authenticatable $user */
+        Filament::auth()->login($user);
 
         session()->regenerate();
 
         return app(LoginResponse::class);
+    }
+
+    /**
+     * The user model of the auth guard of the panel.
+     */
+    protected function findOrCreateUser(array $oauth2User, ?object $claims): Model
+    {
+        /** @var class-string<Model> $userModel */
+        $userModel = Filament::auth()->getProvider()->getModel(); // @phpstan-ignore method.notFound (session guards have a user provider)
+
+        $user = $userModel::firstOrNew(['email' => $oauth2User['email']]);
+        if (! $user->exists) {
+            // Login is only done by the Oauth2-Server, so nobody may know the password
+            $user->setAttribute('password', Hash::make(Str::random(64)));
+        }
+
+        // Update user data if different from Oauth2-Server, save() only writes changes.
+        // The schema is checked, because a new user has no attributes to look at yet.
+        if (isset($claims->preferred_username) && $user->getConnection()->getSchemaBuilder()->hasColumn($user->getTable(), 'username')) {
+            $user->setAttribute('username', $claims->preferred_username);
+        }
+        $user->setAttribute('name', $oauth2User['name'] ?? $user->getAttribute('name') ?? $oauth2User['email']);
+        $user->save();
+
+        return $user;
     }
 
     /**
@@ -173,9 +186,9 @@ class Oauth2Controller extends Controller
      * The signature is not verified: the token is received directly from the
      * token endpoint of the Oauth2-Server, secured by TLS.
      */
-    protected function decodeAccessToken(): ?object
+    protected function decodeAccessToken(string $accessToken): ?object
     {
-        $payload = explode('.', (string) $this->accessToken)[1] ?? null;
+        $payload = explode('.', $accessToken)[1] ?? null;
         if ($payload === null) {
             return null;
         }
@@ -185,26 +198,26 @@ class Oauth2Controller extends Controller
         return is_object($decoded) ? $decoded : null;
     }
 
-    protected function handleRoleMapping(): void
+    protected function handleRoleMapping(Model $user, ?object $claims): void
     {
-        if (config('filament-oauth2.updateRoles') == false) {
+        if (! $this->config('updateRoles')) {
             return;
         }
 
-        $roles = $this->getRolesFromAccessToken();
+        $roles = $this->getRolesFromClaims($claims);
         // No roles claim at all: leave the roles of the user untouched
         if ($roles === null) {
             return;
         }
 
-        if ($this->usesFilamentShield()) {
-            $this->syncShieldRoles($roles);
+        if ($this->usesFilamentShield($user)) {
+            $this->syncShieldRoles($user, $roles);
         } else {
-            $this->syncRoles($roles);
+            $this->syncRoles($user, $roles);
         }
 
         // The access check has to see the synced roles
-        $this->user->unsetRelation('roles');
+        $user->unsetRelation('roles');
     }
 
     /**
@@ -214,11 +227,13 @@ class Oauth2Controller extends Controller
      * an (possibly empty) array of role names otherwise. An empty array removes
      * all roles from the user. If allowedRoles is configured, all other roles
      * are ignored.
+     *
+     * @return array<string>|null
      */
-    protected function getRolesFromAccessToken(): ?array
+    protected function getRolesFromClaims(?object $claims): ?array
     {
-        $clientId = config('filament-oauth2.clientId');
-        $resourceAccess = $this->accessTokenDecoded->resource_access ?? null;
+        $clientId = $this->config('clientId');
+        $resourceAccess = $claims->resource_access ?? null;
 
         if (! isset($resourceAccess->$clientId)) {
             return null;
@@ -226,7 +241,7 @@ class Oauth2Controller extends Controller
 
         $roles = array_values(array_filter((array) ($resourceAccess->$clientId->roles ?? []), 'is_string'));
 
-        $allowedRoles = config('filament-oauth2.allowedRoles', []);
+        $allowedRoles = $this->config('allowedRoles');
         if (! empty($allowedRoles)) {
             $roles = array_values(array_intersect($roles, $allowedRoles));
         }
@@ -238,12 +253,15 @@ class Oauth2Controller extends Controller
      * Filament Shield keeps its roles in the spatie/laravel-permission models,
      * so its role handling has to be used instead of the plain roles()-relation.
      */
-    protected function usesFilamentShield(): bool
+    protected function usesFilamentShield(Model $user): bool
     {
-        return class_exists(self::SHIELD_UTILS) && method_exists($this->user, 'syncRoles');
+        return class_exists(self::SHIELD_UTILS) && method_exists($user, 'syncRoles');
     }
 
-    protected function syncShieldRoles(array $roles): void
+    /**
+     * @param  array<string>  $roles
+     */
+    protected function syncShieldRoles(Model $user, array $roles): void
     {
         $shield = self::SHIELD_UTILS;
 
@@ -255,36 +273,29 @@ class Oauth2Controller extends Controller
         );
 
         // Roles not in the access token any more are removed from the user
-        $this->user->syncRoles($roles);
+        $user->syncRoles($roles); // @phpstan-ignore method.notFound (HasRoles-trait of Shield, see usesFilamentShield())
     }
 
-    protected function syncRoles(array $roles): void
+    /**
+     * @param  array<string>  $roles
+     */
+    protected function syncRoles(Model $user, array $roles): void
     {
-        $userRoles = $this->user->roles();
-        if (! $userRoles) {
+        if (! method_exists($user, 'roles')) {
             return;
         }
 
-        // Disconnect roles not in the access token any more
-        foreach ($userRoles->get()->pluck('name')->toArray() as $userRole) {
-            if (! in_array($userRole, $roles)) {
-                $this->user->roles()->detach(Role::where('name', $userRole)->first()->id);
-            }
-        }
-        // Connect or create roles
-        foreach ($roles as $role) {
-            if (! in_array($role, $this->user->roles->pluck('name')->toArray())) {
-                $existingRole = Role::where('name', $role)->exists();
-                if ($existingRole) {
-                    $this->user->roles()->attach(Role::where('name', $role)->first());
-                } else {
-                    $newRole = Role::create(['name' => $role]);
-                    // needed?
-                    $newRole->save();
-                    $this->user->roles()->attach($newRole);
-                }
-            }
-        }
+        /** @var class-string<Model> $roleModel */
+        $roleModel = $this->config('roleModel');
+
+        // Non-existing roles are created
+        $roleIds = array_map(
+            fn (string $role) => $roleModel::firstOrCreate(['name' => $role])->getKey(),
+            $roles
+        );
+
+        // Roles not in the access token any more are removed from the user
+        $user->roles()->sync($roleIds);
     }
 
     /**
@@ -296,18 +307,18 @@ class Oauth2Controller extends Controller
         abort(403, __('filament-panels::auth/pages/login.messages.failed'));
     }
 
-    public function handleLogout(Request $request)
+    public function handleLogout(Request $request): RedirectResponse
     {
         // https://openid.net/specs/openid-connect-rpinitiated-1_0.html
         Filament::auth()->logout();
         session()->invalidate();
         session()->regenerateToken();
 
-        $query = ['client_id' => config('filament-oauth2.clientId')];
-        if (config('filament-oauth2.urlAfterlogout') != url('/')) {
-            $query['post_logout_redirect_uri'] = config('filament-oauth2.urlAfterlogout');
+        $query = ['client_id' => $this->config('clientId')];
+        if (filled($this->config('urlAfterlogout'))) {
+            $query['post_logout_redirect_uri'] = url($this->config('urlAfterlogout'));
         }
 
-        return redirect(config('filament-oauth2.urlLogout') . '?' . http_build_query($query));
+        return redirect($this->config('urlLogout') . '?' . http_build_query($query));
     }
 }

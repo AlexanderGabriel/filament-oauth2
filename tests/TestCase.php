@@ -4,7 +4,9 @@ namespace AlexanderGabriel\FilamentOauth2\Tests;
 
 use AlexanderGabriel\FilamentOauth2\FilamentOauth2ServiceProvider;
 use AlexanderGabriel\FilamentOauth2\Tests\Fixtures\AdminPanelProvider;
-use App\Models\User;
+use AlexanderGabriel\FilamentOauth2\Tests\Fixtures\OtherPanelProvider;
+use AlexanderGabriel\FilamentOauth2\Tests\Fixtures\Role;
+use AlexanderGabriel\FilamentOauth2\Tests\Fixtures\User;
 use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
 use BladeUI\Icons\BladeIconsServiceProvider;
 use Filament\Actions\ActionsServiceProvider;
@@ -16,14 +18,11 @@ use Filament\Schemas\SchemasServiceProvider;
 use Filament\Support\SupportServiceProvider;
 use Filament\Tables\TablesServiceProvider;
 use Filament\Widgets\WidgetsServiceProvider;
-use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use RyanChandler\BladeCaptureDirective\BladeCaptureDirectiveServiceProvider;
-
-require_once __DIR__ . '/Fixtures/App.php';
 
 class TestCase extends Orchestra
 {
@@ -31,14 +30,11 @@ class TestCase extends Orchestra
     {
         parent::setUp();
 
-        Factory::guessFactoryNamesUsing(
-            fn (string $modelName) => 'AlexanderGabriel\\FilamentOauth2\\Database\\Factories\\' . class_basename($modelName) . 'Factory'
-        );
-
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
+            $table->string('username')->nullable();
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();
@@ -70,6 +66,7 @@ class TestCase extends Orchestra
             TablesServiceProvider::class,
             WidgetsServiceProvider::class,
             AdminPanelProvider::class,
+            OtherPanelProvider::class,
             FilamentOauth2ServiceProvider::class,
         ];
     }
@@ -79,6 +76,7 @@ class TestCase extends Orchestra
         config()->set('app.key', 'base64:' . base64_encode(str_repeat('a', 32)));
         config()->set('database.default', 'testing');
         config()->set('auth.providers.users.model', User::class);
+        config()->set('filament-oauth2.roleModel', Role::class);
 
         config()->set('filament-oauth2.clientId', 'filament');
         config()->set('filament-oauth2.clientSecret', 'secret');

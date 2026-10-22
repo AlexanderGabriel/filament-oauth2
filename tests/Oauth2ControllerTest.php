@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\Role;
-use App\Models\User;
+use AlexanderGabriel\FilamentOauth2\Tests\Fixtures\Role;
+use AlexanderGabriel\FilamentOauth2\Tests\Fixtures\User;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
@@ -115,12 +115,36 @@ it('handles errors of the oauth2 server', function () {
     callback(['error' => 'access_denied', 'code' => ''])->assertForbidden();
 });
 
-it('rejects unverified email addresses', function () {
-    fakeOauth2Server(['email_verified' => false]);
+it('rejects unverified email addresses', function (mixed $emailVerified) {
+    fakeOauth2Server(['email_verified' => $emailVerified]);
 
     callback()->assertForbidden();
 
     expect(User::count())->toBe(0);
+})->with([false, 'false', 0]);
+
+it('accepts verified email addresses sent as string', function () {
+    fakeOauth2Server(['email_verified' => 'true']);
+
+    callback()->assertRedirect();
+});
+
+it('sets the username on the first login', function () {
+    fakeOauth2Server(tokenClaims: ['preferred_username' => 'jane']);
+
+    callback()->assertRedirect();
+
+    expect(User::firstWhere('email', 'jane@example.com')->username)->toBe('jane');
+});
+
+it('keeps the password of an existing user', function () {
+    $user = User::create(['name' => 'Jane Doe', 'email' => 'jane@example.com', 'password' => 'x']);
+    $password = $user->password;
+    fakeOauth2Server();
+
+    callback()->assertRedirect();
+
+    expect($user->fresh()->password)->toBe($password);
 });
 
 it('rejects users without an email address', function () {
@@ -185,4 +209,80 @@ it('logs out by post and redirects to the oauth2 server', function () {
         ->assertRedirect('https://idp.test/logout?client_id=filament&post_logout_redirect_uri=' . urlencode('https://app.test/bye'));
 
     expect(auth()->check())->toBeFalse();
+});
+
+it('logs out without redirect if no url after logout is configured', function () {
+    config()->set('filament-oauth2.urlAfterlogout', null);
+
+    $this->post('/admin/filament-oauth2/handleLogout')
+        ->assertRedirect('https://idp.test/logout?client_id=filament');
+});
+
+it('makes the url after logout absolute', function () {
+    config()->set('filament-oauth2.urlAfterlogout', '/');
+
+    $this->post('/admin/filament-oauth2/handleLogout')
+        ->assertRedirect('https://idp.test/logout?client_id=filament&post_logout_redirect_uri=' . urlencode(url('/')));
+});
+
+it('posts the logout of the user menu to the oauth2 logout', function () {
+    $this->actingAs(User::create(['name' => 'Jane Doe', 'email' => 'jane@example.com', 'password' => 'x']));
+    filament()->setCurrentPanel('admin');
+
+    $logout = filament()->getCurrentPanel()->getUserMenuItems()['logout'];
+
+    expect($logout->getUrl())->toBe(url('/admin/filament-oauth2/handleLogout'))
+        ->and($logout->shouldPostToUrl())->toBeTrue();
+});
+
+it('uses the routes and settings of each panel', function () {
+    $response = $this->get('/other/login');
+
+    parse_str(parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
+    expect($response->headers->get('Location'))->toStartWith('https://other-idp.test/auth?')
+        ->and($query['client_id'])->toBe('other-client')
+        ->and($query['redirect_uri'])->toBe(url('/other/filament-oauth2/handleCallback'));
+});
+
+it('logs in to the panel the callback belongs to', function () {
+    $requests = fakeOauth2Server();
+
+    $this->withSession(['filament-oauth2.state' => 'the-state', 'filament-oauth2.pkceCode' => 'the-verifier'])
+        ->get('/other/filament-oauth2/handleCallback?code=the-code&state=the-state')
+        ->assertRedirect(url('/other'));
+
+    parse_str((string) $requests[0]['request']->getBody(), $tokenRequest);
+    expect($tokenRequest['client_id'])->toBe('other-client')
+        ->and($tokenRequest['redirect_uri'])->toBe(url('/other/filament-oauth2/handleCallback'));
+});
+
+it('creates the roles with the configured role model', function () {
+    config()->set('filament-oauth2.updateRoles', true);
+    Role::create(['name' => 'editor']);
+    fakeOauth2Server(tokenClaims: rolesClaim(['editor', 'viewer']));
+
+    callback()->assertRedirect();
+
+    expect(Role::orderBy('name')->pluck('name')->all())->toBe(['editor', 'viewer'])
+        ->and(auth()->user()->roles()->orderBy('name')->pluck('name')->all())->toBe(['editor', 'viewer']);
+});
+
+it('leaves the roles untouched if the token has no roles claim', function () {
+    config()->set('filament-oauth2.updateRoles', true);
+    $user = User::create(['name' => 'Jane Doe', 'email' => 'jane@example.com', 'password' => 'x']);
+    $user->roles()->attach(Role::create(['name' => 'local']));
+    fakeOauth2Server();
+
+    callback()->assertRedirect();
+
+    expect($user->roles()->pluck('name')->all())->toBe(['local']);
+});
+
+it('updates the name of an existing user', function () {
+    User::create(['name' => 'Old Name', 'email' => 'jane@example.com', 'password' => 'x']);
+    fakeOauth2Server();
+
+    callback()->assertRedirect();
+
+    expect(User::firstWhere('email', 'jane@example.com')->name)->toBe('Jane Doe');
 });

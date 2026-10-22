@@ -6,9 +6,11 @@ parameters:
     paths:
         - src
         - config
-        - database
     tmpDir: build/phpstan
     checkOctaneCompatibility: true
     checkModelProperties: true
-    checkMissingIterableValueType: false
-
+    ignoreErrors:
+        # The config file of the package is not in the config directory of the app
+        -
+            identifier: larastan.noEnvCallsOutsideOfConfig
+            path: config/filament-oauth2.php

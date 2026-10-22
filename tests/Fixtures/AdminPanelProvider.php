@@ -18,10 +18,13 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
+        return $this->configurePanel($panel->default()->id('admin')->path('admin'))
+            ->plugin(FilamentOauth2Plugin::make());
+    }
+
+    protected function configurePanel(Panel $panel): Panel
+    {
         return $panel
-            ->default()
-            ->id('admin')
-            ->path('admin')
             ->pages([Dashboard::class])
             ->middleware([
                 EncryptCookies::class,
@@ -31,7 +34,6 @@ class AdminPanelProvider extends PanelProvider
                 VerifyCsrfToken::class,
                 SubstituteBindings::class,
             ])
-            ->authMiddleware([Authenticate::class])
-            ->plugin(FilamentOauth2Plugin::make());
+            ->authMiddleware([Authenticate::class]);
     }
 }
