@@ -3,8 +3,8 @@
 namespace AlexanderGabriel\FilamentOauth2;
 
 use AlexanderGabriel\FilamentOauth2\Facades\FilamentOauth2;
+use Filament\Actions\Action;
 use Filament\Contracts\Plugin;
-use Filament\Navigation\MenuItem;
 use Filament\Panel;
 
 class FilamentOauth2Plugin implements Plugin
@@ -19,10 +19,8 @@ class FilamentOauth2Plugin implements Plugin
         $panel
             ->login(FilamentOauth2::getLoginRouteAction())
             ->userMenuItems([
-                'logout' => MenuItem::make()->url(function (Panel $panel) {
-                    if(in_array($panel->getPath(), ["/", ""])) return '/' . $this->getId() . '/handleLogout';
-                    return '/' . $panel->getPath() . '/' . $this->getId() . '/handleLogout';
-                }),
+                // Keeps the POST of Filaments logout action, only the url is replaced
+                'logout' => fn (Action $action) => $action->url(route('filament-oauth2.handleLogout')),
             ]);
 
     }

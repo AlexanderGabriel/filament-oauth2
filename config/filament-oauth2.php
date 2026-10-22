@@ -13,5 +13,8 @@ return [
     'urlAfterlogout' => env('OAUTH2_URL_AFTER_LOGOUT', '/'),
     'scopes' => env('OAUTH2_SCOPES', 'profile email openid'),
     'updateRoles' => env('OAUTH2_UPDATE_ROLES', false),
+    // Comma separated list of roles taken from the access token, empty: all roles
+    'allowedRoles' => array_filter(array_map('trim', explode(',', (string) env('OAUTH2_ALLOWED_ROLES', '')))),
+    // Disabling is only allowed outside of production (self-signed certificates in dev/test)
     'verifySsl' => env('OAUTH2_VERIFY_SSL', true),
 ];

@@ -50,7 +50,9 @@ return [
     'urlLogout' => env("OAUTH2_URL_LOGOUT", env("OAUTH2_BASE_URL")."/logout"),
     'urlAfterlogout' => env("OAUTH2_URL_AFTER_LOGOUT", url('/')),
     'scopes' => env("OAUTH2_SCOPES", "profile email openid"),
-    'updateRoles' => env("OAUTH2_UPDATE_ROLES", false)
+    'updateRoles' => env("OAUTH2_UPDATE_ROLES", false),
+    'allowedRoles' => array_filter(array_map('trim', explode(',', (string) env('OAUTH2_ALLOWED_ROLES', '')))),
+    'verifySsl' => env('OAUTH2_VERIFY_SSL', true),
 ];
 ```
 
@@ -101,8 +103,27 @@ class YOURPanelProvider extends PanelProvider
     - look for roles in token and update/create and map them
     - uses Filament Shield if it is installed, App\Models\Role otherwise
     - defaults to false
+- OAUTH2_ALLOWED_ROLES
+    - comma separated list of roles taken from the access token, e.g. `editor,viewer`
+    - all other roles in the token are ignored (neither created nor assigned)
+    - defaults to all roles
 - OAUTH2_VERIFY_SSL
     - disable or enable ssl-verification of keycloak-server (for test/dev-env)
+    - `false` is refused in production (`APP_ENV=production`)
+    - defaults to true
+
+## Security
+
+- Login uses the `state` parameter and PKCE (S256). Enable PKCE for your client in the OAuth2-Server
+  (Keycloak: *Advanced → Proof Key for Code Exchange Code Challenge Method: S256*) and configure the
+  *Valid Redirect URIs* exactly.
+- Users are linked to the OAuth2-Server by their email address. An existing user with the same email
+  address is taken over, so the OAuth2-Server must only provide verified email addresses. Logins with
+  `email_verified = false` are rejected.
+- Roles are synced before the access to the panel is checked, so removing a role in the OAuth2-Server
+  takes effect with the next login. Use `OAUTH2_ALLOWED_ROLES` to restrict which roles may be granted
+  by the OAuth2-Server.
+- Logout is a POST request (protected by CSRF).
 
 ## Changelog
 
