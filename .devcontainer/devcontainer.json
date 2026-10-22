@@ -1,0 +1,20 @@
+{
+    "name": "filament-oauth2",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "args": {
+            // Change to 8.3 or 8.5 to test against another PHP version from the CI matrix
+            "PHP_VERSION": "8.4"
+        }
+    },
+    "postCreateCommand": "composer install --no-interaction",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "bmewburn.vscode-intelephense-client",
+                "m1guelpf.better-pest",
+                "open-southeners.laravel-pint"
+            ]
+        }
+    }
+}
